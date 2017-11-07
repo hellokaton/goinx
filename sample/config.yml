@@ -1,4 +1,5 @@
 
+log_level: info
 access_log:
 http:
   servers:
