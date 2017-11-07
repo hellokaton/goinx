@@ -3,79 +3,61 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
-	"os"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
+type Config struct {
+	AccessLog string `yaml:"access_log"`
+	Http      struct {
+		Servers []Server `yaml:"servers,flow"`
+	}
+}
+
+var (
+	configPath = flag.String("config", "sample/config.yml", "Configuration Path")
+)
+
+func usage() {
+	fmt.Println("Goinx 0.0.1")
+	fmt.Println("Usage: goinx --config=<configfile>\n")
+	fmt.Println("Options:")
+	fmt.Println("\t--config   <configfile>            Configuration Path")
+}
+
 func main() {
-	var cfgfile *string = flag.String("config", "", "configuration file")
 
-	hosts := make(map[string]string)
-	sites := make(map[string]*Site)
-
+	flag.Usage = usage
 	flag.Parse()
 
-	if *cfgfile == "" {
-		usage()
-	}
-
-	cfg, err := ReadConfig(*cfgfile)
+	conf := Config{}
+	bytes, err := ioutil.ReadFile(*configPath)
 	if err != nil {
-		log.Printf("opening %s failed: %v", *cfgfile, err)
-		os.Exit(1)
+		log.Fatal(err)
+		return
+	}
+	err = yaml.Unmarshal(bytes, &conf)
+	if err != nil {
+		log.Fatal(err)
+		return
 	}
 
-	var access_f io.WriteCloser
-	if cfg.Global.Accesslog != "" {
-		access_f, err = os.OpenFile(cfg.Global.Accesslog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
-		if err == nil {
-			defer access_f.Close()
-		} else {
-			log.Printf("Opening access log %s failed: %v", cfg.Global.Accesslog, err)
-		}
-	}
-
-	for _, item := range cfg.Sites {
-		for _, host := range item.Domains {
-			hosts[*host] = item.ProxyPass
-		}
-	}
-
-	for _, item := range cfg.Sites {
-		sites[item.Name] = &Site{
-			Name:         item.Name,
-			ListenAddr:   item.ListenAddr,
-			Domains:      item.Domains,
-			EnableSSL:    item.EnableSSL,
-			AddForwarded: item.AddForwarded,
-			KeyFile:      item.KeyFile,
-			CertFile:     item.CertFile,
-			ProxyPass:    item.ProxyPass,
-		}
-	}
+	log.Println(conf)
 
 	count := 0
 	exit_chan := make(chan int)
-	for name, frontend := range sites {
-		log.Printf("Bind site [ %s ]", name)
-		go func(site *Site, name string) {
-			var accesslogger *log.Logger
-			if access_f != nil {
-				accesslogger = log.New(access_f, "frontend:"+name+" ", log.Ldate|log.Ltime|log.Lmicroseconds)
-			}
-			site.Start(hosts, accesslogger)
+	for _, server := range conf.Http.Servers {
+		go func(server Server) {
+			server.Start()
 			exit_chan <- 1
-		}(frontend, name)
+		}(server)
 		count++
 	}
 
 	for i := 0; i < count; i++ {
 		<-exit_chan
 	}
-}
 
-func usage() {
-	fmt.Fprintf(os.Stdout, "usage: %s -config=<configfile>\n", os.Args[0])
-	os.Exit(1)
 }
