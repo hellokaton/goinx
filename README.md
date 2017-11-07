@@ -10,7 +10,7 @@ go build && ./goinx start
 
 ## Config File
 
-```yml
+```bash
 log_level: info
 access_log:
 http:
