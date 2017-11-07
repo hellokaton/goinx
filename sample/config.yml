@@ -11,7 +11,8 @@ http:
       cert_file:
       key_file:
     # - name:       demo2
-    #   listen:     ":9002"
-    #   domains:    ["localhost", "www.biezhi.com"]
-    #   root:       "/var/www/demo1"
-    #   proxy_pass: "127.0.0.1:8080"
+    #   listen:     ":443"
+    #   domains:    [tale.biezhi.me]
+    #   proxy_pass: "127.0.0.1:9000"
+    #   cert_file: /var/www/ssl/tale.biezhi.me/fullchain.pem
+    #   key_file: /var/www/ssl/tale.biezhi.me/privkey.pem

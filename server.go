@@ -29,7 +29,14 @@ func (s *Server) Start() {
 	}
 
 	http.HandleFunc("/", s.Handler)
-	err := http.ListenAndServe(s.Listen, nil)
+
+	var err error
+	if s.Listen == ":443" {
+		err = http.ListenAndServeTLS(s.Listen, s.CertFile, s.KeyFile, nil)
+	} else {
+		err = http.ListenAndServe(s.Listen, nil)
+	}
+
 	if err != nil {
 		log.Error("%v", err)
 	}
