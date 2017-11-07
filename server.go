@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	log "github.com/biezhi/goinx/log"
 )
@@ -16,6 +17,8 @@ type Server struct {
 	Domains   []string `yaml:"domains"`
 	Root      *string  `yaml:"root"`
 	SSL       bool     `yaml:"ssl"`
+	GZIP      bool     `yaml:"gzip"`
+	GFW       bool     `yaml:"gfw"`
 	ProxyPass *string  `yaml:"proxy_pass"`
 	KeyFile   string   `yaml:"key_file"`
 	CertFile  string   `yaml:"cert_file"`
@@ -52,12 +55,17 @@ func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Bad Request."))
 		return
 	}
+	log.Info("Request URI: %s", r.URL.RequestURI())
 	log.Info("Request [%s] RemoteAddr: %s, Header: %v", r.Host, r.RemoteAddr, r.Header)
 
-	if s.ProxyPass == nil {
-		s.Static(w, r)
+	if s.GFW {
+		s.fuckGFW(w, r)
 	} else {
-		s.Proxy(w, r)
+		if s.ProxyPass == nil {
+			s.Static(w, r)
+		} else {
+			s.Proxy(w, r)
+		}
 	}
 
 }
@@ -65,7 +73,6 @@ func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
 // static server
 func (s *Server) Static(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[1:]
-	log.Info("Request URI: %s", path)
 	data, err := ioutil.ReadFile(*s.Root + "/" + string(path))
 	if err == nil {
 		var contentType string
@@ -77,6 +84,10 @@ func (s *Server) Static(w http.ResponseWriter, r *http.Request) {
 			contentType = "application/javascript"
 		} else if strings.HasSuffix(path, ".png") {
 			contentType = "image/png"
+		} else if strings.HasSuffix(path, ".jpg") {
+			contentType = "image/jepg"
+		} else if strings.HasSuffix(path, ".jepg") {
+			contentType = "image/jepg"
 		} else if strings.HasSuffix(path, ".svg") {
 			contentType = "image/svg+xml"
 		} else {
@@ -117,7 +128,6 @@ func (s *Server) Proxy(w http.ResponseWriter, r *http.Request) {
 	o.Close = false
 
 	transport := http.DefaultTransport
-
 	res, err := transport.RoundTrip(o)
 
 	if err != nil {
@@ -134,9 +144,13 @@ func (s *Server) Proxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// for _, c := range res.SetCookie {
-	// w.Header().Add("Set-Cookie", c.Raw)
-	// }
+	for _, c := range res.Cookies() {
+		hdr.Add("Set-Cookie", c.Raw)
+	}
+
+	if s.GZIP {
+		hdr.Add("Content-Encoding", "gzip")
+	}
 
 	w.WriteHeader(res.StatusCode)
 
@@ -144,6 +158,38 @@ func (s *Server) Proxy(w http.ResponseWriter, r *http.Request) {
 		io.Copy(w, res.Body)
 	}
 
+}
+
+var transport = &http.Transport{
+	ResponseHeaderTimeout: 30 * time.Second,
+}
+
+func (s *Server) fuckGFW(w http.ResponseWriter, r *http.Request) {
+	realurl := *s.ProxyPass + r.RequestURI
+	log.Info("RealURL: %s", realurl)
+	req, err := http.NewRequest(r.Method, realurl, r.Body)
+	resp, err := transport.RoundTrip(req)
+	for {
+		if strings.HasPrefix(resp.Status, "30") {
+			log.Info("Location: %s", resp.Header.Get("Location"))
+			req, err = http.NewRequest(r.Method, resp.Header.Get("Location"), r.Body)
+			resp, err = transport.RoundTrip(req)
+		}
+		break
+	}
+
+	for k, v := range resp.Header {
+		for _, vv := range v {
+			w.Header().Add(k, vv)
+		}
+	}
+	if err != nil {
+		panic(err)
+	}
+	data, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	w.WriteHeader(resp.StatusCode)
+	w.Write(data)
 }
 
 func singleJoiningSlash(a, b string) string {

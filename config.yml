@@ -16,3 +16,8 @@ http:
       # ssl: true
       # cert_file: /Users/biezhi/workspace/ssl/cert.pem
       # key_file: /Users/biezhi/workspace/ssl/key.pem
+    - name:       demo3
+      listen:     ":9003"
+      gfw: true
+      domains:    [www.biezhi.com]
+      proxy_pass: "https://www.google.com"

@@ -28,7 +28,7 @@ const (
 )
 
 var (
-	configPath = flag.String("config", "sample/config.yml", "Configuration Path")
+	configPath = flag.String("config", "config.yml", "Configuration Path")
 	cmds       = []string{"start", "stop", "restart"}
 )
 
@@ -139,9 +139,8 @@ func main() {
 
 	shutdownHook()
 
-	log.Info("Start Goinx.")
-
 	conf := startArgs()
+	log.Info("Start Goinx.")
 
 	if conf.LogLevel == "debug" {
 		log.LogLevelNum = 1
