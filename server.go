@@ -14,6 +14,7 @@ type Server struct {
 	Listen    string   `yaml:"listen"`
 	Domains   []string `yaml:"domains"`
 	Root      *string  `yaml:"root"`
+	SSL       bool     `yaml:"ssl"`
 	ProxyPass *string  `yaml:"proxy_pass"`
 	KeyFile   string   `yaml:"key_file"`
 	CertFile  string   `yaml:"cert_file"`
@@ -21,20 +22,21 @@ type Server struct {
 
 func (s *Server) Start() {
 	if s.ProxyPass != nil {
-		log.Info("%s listen %s, proxy to %s", s.Name, s.Listen, *s.ProxyPass)
+		log.Info("%s listen %s, ssl: %v, proxy to %s", s.Name, s.Listen, s.SSL, *s.ProxyPass)
 	} else {
 		if s.Root != nil {
-			log.Info("%s listen %s, static dir %s", s.Name, s.Listen, *s.Root)
+			log.Info("%s listen %s, ssl: %v, static dir %s", s.Name, s.Listen, s.SSL, *s.Root)
 		}
 	}
 
-	http.HandleFunc("/", s.Handler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.Handler)
 
 	var err error
-	if s.Listen == ":443" {
-		err = http.ListenAndServeTLS(s.Listen, s.CertFile, s.KeyFile, nil)
+	if s.SSL {
+		err = http.ListenAndServeTLS(s.Listen, s.CertFile, s.KeyFile, mux)
 	} else {
-		err = http.ListenAndServe(s.Listen, nil)
+		err = http.ListenAndServe(s.Listen, mux)
 	}
 
 	if err != nil {
