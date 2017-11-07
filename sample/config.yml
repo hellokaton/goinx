@@ -9,10 +9,10 @@ http:
       proxy_pass: http://127.0.0.1:8080
       cert_file:
       key_file:
-    # - name:       demo2
-    #   listen:     ":9002"
-    #   domains:    [localhost]
-    #   root: /Users/biezhi/workspace/wwwroot/www.jq22.com/demo/bootstrap-moban20150917
-    #   # ssl: true
-    #   cert_file: /Users/biezhi/workspace/ssl/cert.pem
-    #   key_file: /Users/biezhi/workspace/ssl/key.pem
+    - name:       demo2
+      listen:     ":9002"
+      domains:    [localhost]
+      root: /Users/biezhi/workspace/wwwroot/www.jq22.com/demo/bootstrap-moban20150917
+      # ssl: true
+      # cert_file: /Users/biezhi/workspace/ssl/cert.pem
+      # key_file: /Users/biezhi/workspace/ssl/key.pem

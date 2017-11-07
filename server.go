@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -63,7 +64,31 @@ func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
 
 // static server
 func (s *Server) Static(w http.ResponseWriter, r *http.Request) {
-	http.FileServer(http.Dir(*s.Root))
+	path := r.URL.Path[1:]
+	log.Info("Request URI: %s", path)
+	data, err := ioutil.ReadFile(*s.Root + "/" + string(path))
+	if err == nil {
+		var contentType string
+		if strings.HasSuffix(path, ".css") {
+			contentType = "text/css"
+		} else if strings.HasSuffix(path, ".html") {
+			contentType = "text/html"
+		} else if strings.HasSuffix(path, ".js") {
+			contentType = "application/javascript"
+		} else if strings.HasSuffix(path, ".png") {
+			contentType = "image/png"
+		} else if strings.HasSuffix(path, ".svg") {
+			contentType = "image/svg+xml"
+		} else {
+			contentType = "text/plain"
+		}
+
+		w.Header().Add("Content Type", contentType)
+		w.Write(data)
+	} else {
+		w.WriteHeader(404)
+		w.Write([]byte("404 My dear - " + http.StatusText(404)))
+	}
 }
 
 // proxy server
