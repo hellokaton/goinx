@@ -5,5 +5,11 @@
 ## Usage
 
 ```bash
-go build && ./goinx --config=sample/config.yml
+go build && ./goinx start
+```
+
+## Config File
+
+```yml
+
 ```
