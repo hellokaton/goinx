@@ -3,8 +3,9 @@ package main
 import (
 	"io"
 	"log"
-	"net"
-	"os"
+	"net/http"
+	"net/url"
+	"strings"
 )
 
 type Server struct {
@@ -19,75 +20,78 @@ type Server struct {
 
 func (s *Server) Start() {
 	log.Printf("[%s] listen %s proxy to %s", s.Name, s.Listen, s.ProxyPass)
-	listener, err := net.Listen("tcp", s.Listen)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+		if !Contains(s.Domains, strings.Replace(r.Host, s.Listen, "", -1)) {
+			w.Write([]byte("Bad Request."))
+			return
+		}
+
+		o := new(http.Request)
+
+		*o = *r
+		targetURL, err := url.Parse(s.ProxyPass)
+
+		o.Host = targetURL.Host
+		o.URL.Scheme = targetURL.Scheme
+		o.URL.Host = targetURL.Host
+		o.URL.Path = singleJoiningSlash(targetURL.Path, o.URL.Path)
+
+		if q := o.URL.RawQuery; q != "" {
+			o.URL.RawPath = o.URL.Path + "?" + q
+		} else {
+			o.URL.RawPath = o.URL.Path
+		}
+
+		o.URL.RawQuery = targetURL.RawQuery
+
+		o.Proto = "HTTP/1.1"
+		o.ProtoMajor = 1
+		o.ProtoMinor = 1
+		o.Close = false
+
+		transport := http.DefaultTransport
+
+		res, err := transport.RoundTrip(o)
+
+		if err != nil {
+			log.Printf("http: proxy error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		hdr := w.Header()
+
+		for k, vv := range res.Header {
+			for _, v := range vv {
+				hdr.Add(k, v)
+			}
+		}
+
+		// for _, c := range res.SetCookie {
+		// w.Header().Add("Set-Cookie", c.Raw)
+		// }
+
+		w.WriteHeader(res.StatusCode)
+
+		if res.Body != nil {
+			io.Copy(w, res.Body)
+		}
+	})
+	err := http.ListenAndServe(s.Listen, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Fatalln(err)
-			os.Exit(0)
-		}
-
-		go s.Serve(conn)
-	}
-
 }
 
-func (s *Server) Serve(conn net.Conn) error {
-	defer conn.Close()
-
-	// get first 3 bytes of connection as header
-	header := make([]byte, 3)
-	if _, err := io.ReadAtLeast(conn, header, 3); err != nil {
-		return err
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
 	}
-
-	// identify protocol from header
-	address := s.ProxyPass
-	log.Printf("[INFO] proxy: from=%s to=%s\n", conn.RemoteAddr(), address)
-
-	// connect to remote
-	remote, err := net.Dial("tcp", address)
-	if err != nil {
-		log.Printf("[ERROR] remote: %s\n", err)
-		return err
-	}
-	defer remote.Close()
-
-	// write header we chopped back to remote
-	remote.Write(header)
-
-	// proxy between us and remote server
-	err = Shovel(conn, remote)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// proxy between two sockets
-func Shovel(local, remote io.ReadWriteCloser) error {
-	errch := make(chan error, 1)
-
-	go chanCopy(errch, local, remote)
-	go chanCopy(errch, remote, local)
-
-	for i := 0; i < 2; i++ {
-		if err := <-errch; err != nil {
-			// If this returns early the second func will push into the
-			// buffer, and the GC will clean up
-			return err
-		}
-	}
-	return nil
-}
-
-// copy between pipes, sending errors to channel
-func chanCopy(e chan error, dst, src io.ReadWriter) {
-	_, err := io.Copy(dst, src)
-	e <- err
+	return a + b
 }

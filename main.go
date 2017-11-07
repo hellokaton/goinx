@@ -24,7 +24,7 @@ func usage() {
 	fmt.Println("Goinx 0.0.1")
 	fmt.Println("Usage: goinx --config=<configfile>\n")
 	fmt.Println("Options:")
-	fmt.Println("\t--config   <configfile>            Configuration Path")
+	fmt.Println("\t--config\tConfiguration Path")
 }
 
 func main() {

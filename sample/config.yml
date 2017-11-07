@@ -4,11 +4,11 @@ http:
   servers:
     - name:       demo1
       listen:     ":9001"
-      domains:    ["localhost", "www.biezhi.com"]
-      root:       "/var/www/demo1"
-      proxy_pass: "127.0.0.1:8080"
+      domains:    [localhost, www.biezhi.com]
+      root:       /var/www/demo1
+      proxy_pass: http://127.0.0.1:8080
       cert_file:
-      key_file: 
+      key_file:
     # - name:       demo2
     #   listen:     ":9002"
     #   domains:    ["localhost", "www.biezhi.com"]
