@@ -2,11 +2,36 @@
 
 💞 domain proxy server written in golang
 
+## Feature
+
+- Support static server
+- Support multi domain proxy
+- Support HTTPS
+- Support GFW reverse proxy
+
 ## Usage
 
+**By Binary**
+
+Go [Releases](https://github.com/biezhi/goinx/releases) download the corresponding platform.
+
+**By Golang**
+
 ```bash
-go build && ./goinx start
+» ./goinx
+💖  Goinx 0.0.1
+Author: biezhi
+Github: https://github.com/biezhi/goinx
+
+Usage: goinx [start|stop|restart]
+
+Options:
+
+    --config    Configuration path
+    --help      Help info
 ```
+
+[Document](https://github.com/biezhi/goinx/wiki)
 
 ## Config File
 

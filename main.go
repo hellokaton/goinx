@@ -33,7 +33,7 @@ var (
 )
 
 func usage() {
-	fmt.Printf("💖 %s %s\n", ProjectName, Version)
+	fmt.Printf("💖  %s %s\n", ProjectName, Version)
 	fmt.Println("Author: biezhi")
 	fmt.Println("Github: https://github.com/biezhi/goinx")
 	fmt.Println("\nUsage: goinx [start|stop|restart]\n")
