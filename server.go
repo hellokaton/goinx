@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -162,20 +163,45 @@ func (s *Server) Proxy(w http.ResponseWriter, r *http.Request) {
 
 var transport = &http.Transport{
 	ResponseHeaderTimeout: 30 * time.Second,
+	TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 }
 
 func (s *Server) fuckGFW(w http.ResponseWriter, r *http.Request) {
 	realurl := *s.ProxyPass + r.RequestURI
 	log.Info("RealURL: %s", realurl)
+
 	req, err := http.NewRequest(r.Method, realurl, r.Body)
+	req.Header.Set("Accept", r.Header.Get("Accept"))
+	req.Header.Set("Accept-Encoding", r.Header.Get("Accept-Encoding"))
+	req.Header.Set("Accept-Language", r.Header.Get("Accept-Language"))
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("User-Agent", r.Header.Get("User-Agent"))
+	req.Header.Set("Cookie", r.Header.Get("Cookie"))
+
 	resp, err := transport.RoundTrip(req)
-	for {
-		if strings.HasPrefix(resp.Status, "30") {
-			log.Info("Location: %s", resp.Header.Get("Location"))
-			req, err = http.NewRequest(r.Method, resp.Header.Get("Location"), r.Body)
-			resp, err = transport.RoundTrip(req)
+	if err != nil {
+		log.Error("%v", err)
+		return
+	}
+
+	if resp.StatusCode == 301 || resp.StatusCode == 302 {
+		location := resp.Header.Get("Location")
+		log.Info("Location: %s", location)
+		req, err = http.NewRequest(r.Method, location, r.Body)
+		req.Header.Set("Accept", r.Header.Get("Accept"))
+		req.Header.Set("Accept-Encoding", r.Header.Get("Accept-Encoding"))
+		req.Header.Set("Accept-Language", r.Header.Get("Accept-Language"))
+		req.Header.Set("Cache-Control", "no-cache")
+		req.Header.Set("Pragma", "no-cache")
+		req.Header.Set("User-Agent", r.Header.Get("User-Agent"))
+		req.Header.Set("Cookie", r.Header.Get("Cookie"))
+
+		resp, err = transport.RoundTrip(req)
+		if err != nil {
+			log.Error("%v", err)
+			return
 		}
-		break
 	}
 
 	for k, v := range resp.Header {
@@ -183,13 +209,19 @@ func (s *Server) fuckGFW(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add(k, vv)
 		}
 	}
+	w.Header().Add("Cache-Control", "no-cache")
+	w.Header().Add("Content-Type", resp.Header.Get("Content-Type"))
+
 	if err != nil {
-		panic(err)
+		log.Error("%v", err)
+		return
 	}
+
 	data, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	w.WriteHeader(resp.StatusCode)
 	w.Write(data)
+
 }
 
 func singleJoiningSlash(a, b string) string {
